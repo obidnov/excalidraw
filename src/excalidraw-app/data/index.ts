@@ -7,7 +7,7 @@ import {
 import { serializeAsJSON } from "../../data/json";
 import { restore } from "../../data/restore";
 import { ImportedDataState } from "../../data/types";
-import { isInvisiblySmallElement } from "../../element/sizeHelpers";
+import { isInvisiblySmallElement } from "../../element";
 import { isInitializedImageElement } from "../../element/typeChecks";
 import { ExcalidrawElement, FileId } from "../../element/types";
 import { t } from "../../i18n";
@@ -23,8 +23,8 @@ import {
   FILE_UPLOAD_MAX_BYTES,
   ROOM_ID_BYTES,
 } from "../app_constants";
+import { getStorageBackend } from "./config";
 import { encodeFilesForUpload } from "./FileManager";
-import { saveFilesToFirebase } from "./firebase";
 
 export type SyncableExcalidrawElement = ExcalidrawElement & {
   _brand: "SyncableExcalidrawElement";
@@ -34,10 +34,7 @@ export const isSyncableElement = (
   element: ExcalidrawElement,
 ): element is SyncableExcalidrawElement => {
   if (element.isDeleted) {
-    if (element.updated > Date.now() - DELETED_ELEMENT_TIMEOUT) {
-      return true;
-    }
-    return false;
+    return element.updated > Date.now() - DELETED_ELEMENT_TIMEOUT;
   }
   return !isInvisiblySmallElement(element);
 };
@@ -329,7 +326,8 @@ export const exportToBackend = async (
       url.hash = `json=${json.id},${encryptionKey}`;
       const urlString = url.toString();
 
-      await saveFilesToFirebase({
+      const storageBackend = await getStorageBackend();
+      await storageBackend.saveFilesToStorageBackend({
         prefix: `/files/shareLinks/${json.id}`,
         files: filesToUpload,
       });

@@ -36,13 +36,7 @@ import {
   SocketUpdateDataSource,
   SyncableExcalidrawElement,
 } from "../data";
-import {
-  isSavedToFirebase,
-  loadFilesFromFirebase,
-  loadFromFirebase,
-  saveFilesToFirebase,
-  saveToFirebase,
-} from "../data/firebase";
+import { getStorageBackend, storageBackend } from "../data/config";
 import {
   importUsernameFromLocalStorage,
   saveUsernameToLocalStorage,
@@ -128,7 +122,12 @@ class Collab extends PureComponent<Props, CollabState> {
           throw new AbortError();
         }
 
-        return loadFilesFromFirebase(`files/rooms/${roomId}`, roomKey, fileIds);
+        const storageBackend = await getStorageBackend();
+        return storageBackend.loadFilesFromStorageBackend(
+          `files/rooms/${roomId}`,
+          roomKey,
+          fileIds,
+        );
       },
       saveFiles: async ({ addedFiles }) => {
         const { roomId, roomKey } = this.portal;
@@ -136,7 +135,8 @@ class Collab extends PureComponent<Props, CollabState> {
           throw new AbortError();
         }
 
-        return saveFilesToFirebase({
+        const storageBackend = await getStorageBackend();
+        return storageBackend.saveFilesToStorageBackend({
           prefix: `${FIREBASE_STORAGE_PREFIXES.collabFiles}/${roomId}`,
           files: await encodeFilesForUpload({
             files: addedFiles,
@@ -217,7 +217,7 @@ class Collab extends PureComponent<Props, CollabState> {
     if (
       this.isCollaborating() &&
       (this.fileManager.shouldPreventUnload(syncableElements) ||
-        !isSavedToFirebase(this.portal, syncableElements))
+        !storageBackend?.isSaved(this.portal, syncableElements))
     ) {
       // this won't run in time if user decides to leave the site, but
       //  the purpose is to run in immediately after user decides to stay
@@ -243,7 +243,8 @@ class Collab extends PureComponent<Props, CollabState> {
     syncableElements: readonly SyncableExcalidrawElement[],
   ) => {
     try {
-      const savedData = await saveToFirebase(
+      const storageBackend = await getStorageBackend();
+      const savedData = await storageBackend.saveToStorageBackend(
         this.portal,
         syncableElements,
         this.excalidrawAPI.getAppState(),
@@ -259,6 +260,12 @@ class Collab extends PureComponent<Props, CollabState> {
         );
       }
     } catch (error: any) {
+      this.setState({
+        // firestore doesn't return a specific error code when size exceeded
+        errorMessage: /is longer than.*?bytes/.test(error.message)
+          ? t("errors.collabSaveFailed_sizeExceeded")
+          : t("errors.collabSaveFailed"),
+      });
       console.error(error);
     }
   };
@@ -567,7 +574,8 @@ class Collab extends PureComponent<Props, CollabState> {
       this.excalidrawAPI.resetScene();
 
       try {
-        const elements = await loadFromFirebase(
+        const storageBackend = await getStorageBackend();
+        const elements = await storageBackend.loadFromStorageBackend(
           roomLinkData.roomId,
           roomLinkData.roomKey,
           this.portal.socket,
@@ -644,7 +652,7 @@ class Collab extends PureComponent<Props, CollabState> {
   ) => {
     this.excalidrawAPI.updateScene({
       elements,
-      commitToHistory: !!init,
+      commitToHistory: init,
     });
 
     // We haven't yet implemented multiplayer undo functionality, so we clear the undo stack
