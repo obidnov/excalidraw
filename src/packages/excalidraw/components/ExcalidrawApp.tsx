@@ -56,7 +56,7 @@ import "../../../excalidraw-app/index.scss";
 import { updateStaleImageStatuses } from "../../../excalidraw-app/data/FileManager";
 import { newElementWith } from "../../../element/mutateElement";
 import { isInitializedImageElement } from "../../../element/typeChecks";
-import { loadFilesFromFirebase } from "../../../excalidraw-app/data/firebase";
+import { getStorageBackend } from "../../../excalidraw-app/data/config";
 import { LocalData } from "../../../excalidraw-app/data/LocalData";
 import { isBrowserStorageStateNewer } from "../../../excalidraw-app/data/tabSync";
 import clsx from "clsx";
@@ -226,7 +226,7 @@ const ExcalidrawWrapper = (props: ExcalidrawAppProps) => {
       return;
     }
 
-    const loadImages = (
+    const loadImages = async (
       data: ResolutionType<typeof initializeScene>,
       isInitialLoad = false,
     ) => {
@@ -263,22 +263,25 @@ const ExcalidrawWrapper = (props: ExcalidrawAppProps) => {
           }, [] as FileId[]) || [];
 
         if (data.isExternalScene) {
-          loadFilesFromFirebase(
-            `${FIREBASE_STORAGE_PREFIXES.shareLinkFiles}/${data.id}`,
-            data.key,
-            fileIds,
-          ).then((response) => {
-            if (!response) {
-              return;
-            }
-            const { loadedFiles, erroredFiles } = response;
-            excalidrawAPI.addFiles(loadedFiles);
-            updateStaleImageStatuses({
-              excalidrawAPI,
-              erroredFiles,
-              elements: excalidrawAPI.getSceneElementsIncludingDeleted(),
+          const storageBackend = await getStorageBackend();
+          return storageBackend
+            .loadFilesFromStorageBackend(
+              `${FIREBASE_STORAGE_PREFIXES.shareLinkFiles}/${data.id}`,
+              data.key,
+              fileIds,
+            )
+            .then((response) => {
+              if (!response) {
+                return;
+              }
+              const { loadedFiles, erroredFiles } = response;
+              excalidrawAPI.addFiles(loadedFiles);
+              updateStaleImageStatuses({
+                excalidrawAPI,
+                erroredFiles,
+                elements: excalidrawAPI.getSceneElementsIncludingDeleted(),
+              });
             });
-          });
         } else if (isInitialLoad) {
           if (fileIds.length) {
             LocalData.fileStorage.getFiles(fileIds).then((response) => {
@@ -304,7 +307,7 @@ const ExcalidrawWrapper = (props: ExcalidrawAppProps) => {
     };
 
     initializeScene({ collabAPI }).then(async (data) => {
-      loadImages(data, /* isInitialLoad */ true);
+      await loadImages(data, /* isInitialLoad */ true);
 
       initialStatePromiseRef.current.promise.resolve({
         ...data.scene,
@@ -335,8 +338,8 @@ const ExcalidrawWrapper = (props: ExcalidrawAppProps) => {
         }
         excalidrawAPI.updateScene({ appState: { isLoading: true } });
 
-        initializeScene({ collabAPI }).then((data) => {
-          loadImages(data);
+        initializeScene({ collabAPI }).then(async (data) => {
+          await loadImages(data);
           if (data.scene) {
             excalidrawAPI.updateScene({
               ...data.scene,
