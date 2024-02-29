@@ -176,16 +176,19 @@ export const MobileMenu = ({
       getSelectedElements(elements, appState).length === 0;
 
     if (appState.viewModeEnabled) {
-      return (
-        <div className="App-toolbar-content">
-          {actionManager.renderAction("toggleCanvasMenu")}
-        </div>
-      );
+      return null;
+      // TODO: uncomment after fixing the mobile export
+      // return (
+      //   <div className="App-toolbar-content">
+      //     {actionManager.renderAction("toggleCanvasMenu")}
+      //   </div>
+      // );
     }
 
     return (
       <div className="App-toolbar-content">
-        {actionManager.renderAction("toggleCanvasMenu")}
+        {/* TODO: uncomment after fixing the mobile export */}
+        {/* {actionManager.renderAction("toggleCanvasMenu")} */}
         {actionManager.renderAction("toggleEditMenu")}
 
         {actionManager.renderAction("undo")}
