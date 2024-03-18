@@ -239,6 +239,8 @@ export const textWysiwyg = ({
 
   const editable = document.createElement("textarea");
 
+  editable.spellcheck = false;
+
   editable.dir = "auto";
   editable.tabIndex = 0;
   editable.dataset.type = "wysiwyg";
